@@ -97,7 +97,11 @@ begin
       new.raw_user_meta_data ->> 'name',
       ''
     )
-  );
+  )
+  on conflict (id) do update set
+    email = coalesce(excluded.email, public.profiles.email),
+    phone = coalesce(excluded.phone, public.profiles.phone),
+    updated_at = now();
   return new;
 end;
 $$;
@@ -113,14 +117,10 @@ security definer
 set search_path = public
 as $$
 begin
-  update public.profiles set
-    email = case when new.email_confirmed_at is not null then new.email else profiles.email end,
-    phone = coalesce(new.phone, profiles.phone),
-    full_name = coalesce(
-      new.raw_user_meta_data ->> 'full_name',
-      new.raw_user_meta_data ->> 'name',
-      profiles.full_name
-    ),
+  update public.profiles
+  set
+    email = coalesce(new.email, email),
+    phone = coalesce(new.phone, phone),
     updated_at = now()
   where id = new.id;
   return new;

@@ -302,24 +302,40 @@ function AuthHub({
 }) {
   async function google() {
     onError(null);
-    const redirectTo = Linking.createURL("auth/callback");
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo, skipBrowserRedirect: true },
-    });
-    if (error || !data.url) {
-      onError(error?.message ?? "Google sign-in failed");
-      return;
-    }
-    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-    if (result.type === "success" && result.url) {
-      const parsed = Linking.parse(result.url);
-      const code = parsed.queryParams?.code;
-      const codeStr = Array.isArray(code) ? code[0] : code;
-      if (codeStr) {
-        const { error: exErr } = await supabase.auth.exchangeCodeForSession(codeStr);
-        if (exErr) onError(exErr.message);
+    try {
+      const redirectTo = Linking.createURL("auth/callback");
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo, skipBrowserRedirect: true },
+      });
+      if (error || !data.url) {
+        onError(error?.message ?? "Google sign-in failed");
+        return;
       }
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      if (result.type === "success" && result.url) {
+        const parsed = Linking.parse(result.url);
+        const code = parsed.queryParams?.code;
+        const codeStr = Array.isArray(code) ? code[0] : code;
+        if (codeStr) {
+          const { error: exErr } = await supabase.auth.exchangeCodeForSession(codeStr);
+          if (exErr) onError(exErr.message);
+        } else if (parsed.queryParams?.access_token && parsed.queryParams?.refresh_token) {
+          const accessToken = Array.isArray(parsed.queryParams.access_token)
+            ? parsed.queryParams.access_token[0]
+            : parsed.queryParams.access_token;
+          const refreshToken = Array.isArray(parsed.queryParams.refresh_token)
+            ? parsed.queryParams.refresh_token[0]
+            : parsed.queryParams.refresh_token;
+          const { error: setErr } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (setErr) onError(setErr.message);
+        }
+      }
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Google OAuth session failed");
     }
   }
 
