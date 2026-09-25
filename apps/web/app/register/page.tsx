@@ -53,7 +53,10 @@ export default function RegisterPage() {
     setMessage(null);
 
     const supabase = createClient();
-    const origin = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
+    const origin =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000");
     const { data, error: err } = await supabase.auth.signUp({
       email: email.trim(),
       password,
