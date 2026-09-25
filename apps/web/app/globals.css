@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  /* High contrast WCAG AA/AAA certified palette */
+  --background: #fbf9f4;
+  --foreground: #11261f;
+  --muted-foreground: #384f45;
+  --brand: #165b46;
+  --brand-hover: #124b3a;
+  --brand-dark: #0d382b;
+  --brand-light: #e8f3ef;
+  --accent: #926914;
+  --accent-light: #fef8eb;
+  --card: #ffffff;
+  --card-border: #ded8cb;
+  --border-focus: #165b46;
+  --error: #b91c1c;
+  --error-bg: #fef2f2;
+  --success: #15803d;
+  --success-bg: #f0fdf4;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-light: var(--brand-light);
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
+  --color-card: var(--card);
+  --color-card-border: var(--card-border);
+  --color-error: var(--error);
+  --color-error-bg: var(--error-bg);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Keyboard accessibility outline styles */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
+/* Shimmer animation for loading skeletons */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(225, 220, 210, 0.4) 25%,
+    rgba(240, 236, 228, 0.8) 50%,
+    rgba(225, 220, 210, 0.4) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite ease-in-out;
+}

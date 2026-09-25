@@ -1,0 +1,13 @@
+{
+  "name": "parasnath-schl-project",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "dev:mobile": "pnpm --filter mobile start",
+    "build:web": "pnpm --filter web build"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

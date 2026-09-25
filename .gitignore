@@ -1,0 +1,24 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Next.js & Expo Builds
+.next
+.expo
+dist
+web-build
+.turbo
+
+# Environment secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# TypeScript & OS & Word Temp files
+*.tsbuildinfo
+expo-env.d.ts
+*.log
+.DS_Store
+Thumbs.db
+~$*

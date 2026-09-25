@@ -1,0 +1,3 @@
+-- Run in Supabase SQL Editor after you have signed up once.
+-- update public.profiles set role = 'admin' where email = 'you@example.com';
+-- update public.profiles set role = 'admin' where phone = '+91XXXXXXXXXX';
