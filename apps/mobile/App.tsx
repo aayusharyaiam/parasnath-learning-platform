@@ -64,6 +64,45 @@ type Screen =
   | "privacy"
   | "soon";
 
+const DEMO_MOBILE_PROFILES: Record<string, Profile> = {
+  admin: {
+    id: "demo-admin-id",
+    email: "admin@parasnath.edu",
+    phone: "+919876543212",
+    full_name: "Principal R. K. Parasnath (Admin)",
+    role: "admin",
+    class_id: "class-10-id",
+    section: "Admin",
+    roll_number: "001",
+    school_name: "Parasnath Public School",
+    profile_completed_at: "2026-09-01T00:00:00Z",
+  },
+  student: {
+    id: "demo-student-id",
+    email: "student@parasnath.edu",
+    phone: "+919876543210",
+    full_name: "Aarav Sharma (Student)",
+    role: "student",
+    class_id: "class-10-id",
+    section: "A",
+    roll_number: "24",
+    school_name: "Parasnath Public School",
+    profile_completed_at: "2026-09-01T00:00:00Z",
+  },
+  teacher: {
+    id: "demo-teacher-id",
+    email: "teacher@parasnath.edu",
+    phone: "+919876543211",
+    full_name: "Dr. Sunita Verma (Teacher)",
+    role: "teacher",
+    class_id: "class-10-id",
+    section: "A",
+    roll_number: null,
+    school_name: "Parasnath Public School",
+    profile_completed_at: "2026-09-01T00:00:00Z",
+  },
+};
+
 export default function App() {
   const [ready, setReady] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -100,7 +139,6 @@ export default function App() {
       setReady(true);
       return;
     }
-    // Safety timeout: ensure ready is set within 2s even if network is slow
     const timer = setTimeout(() => setReady(true), 2000);
     void refresh();
     const { data: sub } = supabase.auth.onAuthStateChange(() => {
@@ -135,6 +173,13 @@ export default function App() {
         <AuthHub
           onEmail={() => setScreen("email")}
           onPhone={() => setScreen("phone")}
+          onDemoSelect={(role) => {
+            const p = DEMO_MOBILE_PROFILES[role];
+            if (p) {
+              setProfile(p);
+              setScreen("home");
+            }
+          }}
           onFaq={() => setScreen("faq")}
           onPrivacy={() => setScreen("privacy")}
           onCrisis={() => setShowCrisis(true)}
@@ -143,11 +188,19 @@ export default function App() {
       ) : null}
 
       {screen === "email" ? (
-        <EmailAuth onBack={() => setScreen("hub")} onError={setError} />
+        <EmailAuth
+          onBack={() => setScreen("hub")}
+          onError={setError}
+          onSuccess={refresh}
+        />
       ) : null}
 
       {screen === "phone" ? (
-        <PhoneAuth onBack={() => setScreen("hub")} onError={setError} />
+        <PhoneAuth
+          onBack={() => setScreen("hub")}
+          onError={setError}
+          onSuccess={refresh}
+        />
       ) : null}
 
       {screen === "profile" && profile ? (
@@ -199,6 +252,8 @@ export default function App() {
           }}
           onSignOut={async () => {
             await supabase.auth.signOut();
+            setProfile(null);
+            setScreen("hub");
           }}
         />
       ) : null}
@@ -288,6 +343,7 @@ function CrisisModal({ visible, onClose }: { visible: boolean; onClose: () => vo
 function AuthHub({
   onEmail,
   onPhone,
+  onDemoSelect,
   onFaq,
   onPrivacy,
   onCrisis,
@@ -295,12 +351,16 @@ function AuthHub({
 }: {
   onEmail: () => void;
   onPhone: () => void;
+  onDemoSelect: (role: "admin" | "student" | "teacher") => void;
   onFaq: () => void;
   onPrivacy: () => void;
   onCrisis: () => void;
   onError: (m: string | null) => void;
 }) {
+  const [busy, setBusy] = useState(false);
+
   async function google() {
+    setBusy(true);
     onError(null);
     try {
       const redirectTo = Linking.createURL("auth/callback");
@@ -310,9 +370,11 @@ function AuthHub({
       });
       if (error || !data.url) {
         onError(error?.message ?? "Google sign-in failed");
+        setBusy(false);
         return;
       }
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      setBusy(false);
       if (result.type === "success" && result.url) {
         const parsed = Linking.parse(result.url);
         const code = parsed.queryParams?.code;
@@ -335,6 +397,7 @@ function AuthHub({
         }
       }
     } catch (e) {
+      setBusy(false);
       onError(e instanceof Error ? e.message : "Google OAuth session failed");
     }
   }
@@ -350,8 +413,31 @@ function AuthHub({
         NCERT topics, competency micro-tests, handwritten uploads, and AI mind-maps.
       </Text>
 
-      <Pressable style={styles.btnLight} onPress={google}>
-        <Text style={styles.btnLightText}>Continue with Google</Text>
+      {/* 1-Click Instant Demo Access Box */}
+      <View style={[styles.card, { backgroundColor: "#e8f3ef", borderColor: "#165b4633" }]}>
+        <Text style={{ fontSize: 11, fontWeight: "bold", color: "#165b46", textTransform: "uppercase" }}>
+          ⚡ 1-Click Instant Demo Switcher
+        </Text>
+        <Text style={[styles.muted, { fontSize: 11, marginBottom: 8, marginTop: 2 }]}>
+          Test all screens &amp; permissions instantly on this phone:
+        </Text>
+        <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+          <Pressable style={[styles.chip, styles.chipOn]} onPress={() => onDemoSelect("admin")}>
+            <Text style={styles.chipOnText}>👑 Admin Demo</Text>
+          </Pressable>
+          <Pressable style={[styles.chip, styles.chipOn]} onPress={() => onDemoSelect("student")}>
+            <Text style={styles.chipOnText}>🎓 Student Demo</Text>
+          </Pressable>
+          <Pressable style={[styles.chip, styles.chipOn]} onPress={() => onDemoSelect("teacher")}>
+            <Text style={styles.chipOnText}>🧑🏫 Teacher Demo</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <Text style={[styles.label, { marginTop: 16 }]}>Or Sign In with Your Account:</Text>
+
+      <Pressable style={styles.btnLight} onPress={google} disabled={busy}>
+        <Text style={styles.btnLightText}>{busy ? "Connecting Google..." : "Continue with Google"}</Text>
       </Pressable>
       <Pressable style={styles.btn} onPress={onEmail}>
         <Text style={styles.btnText}>Continue with Email</Text>
@@ -378,14 +464,17 @@ function AuthHub({
 function EmailAuth({
   onBack,
   onError,
+  onSuccess,
 }: {
   onBack: () => void;
   onError: (m: string | null) => void;
+  onSuccess: () => Promise<void>;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"in" | "up">("in");
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   function validate() {
     setFieldError(null);
@@ -402,22 +491,42 @@ function EmailAuth({
 
   async function submit() {
     if (!validate()) return;
+    setBusy(true);
+    setFieldError(null);
     onError(null);
-    if (mode === "in") {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-      if (error) onError(error.message);
-    } else {
-      const { error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-      });
-      if (error) onError(error.message);
-      else {
-        Alert.alert("Account Created", "You can now sign in and complete your details.");
+
+    try {
+      if (mode === "in") {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        setBusy(false);
+        if (error) {
+          setFieldError(error.message);
+          onError(error.message);
+          return;
+        }
+        if (data.session) {
+          await onSuccess();
+        }
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+        });
+        setBusy(false);
+        if (error) {
+          setFieldError(error.message);
+          onError(error.message);
+        } else {
+          Alert.alert("Account Created", "You can now sign in with your email and password.");
+          setMode("in");
+        }
       }
+    } catch (e) {
+      setBusy(false);
+      setFieldError(e instanceof Error ? e.message : "Sign-in failed");
     }
   }
 
@@ -427,7 +536,12 @@ function EmailAuth({
         <Text style={styles.link}>← Back to sign-in options</Text>
       </Pressable>
       <Text style={styles.h1}>{mode === "in" ? "Email Sign In" : "Create Account"}</Text>
-      {fieldError ? <Text style={styles.errorText}>{fieldError}</Text> : null}
+
+      {fieldError ? (
+        <View style={{ backgroundColor: "#fee2e2", padding: 10, borderRadius: 10, marginBottom: 10 }}>
+          <Text style={{ color: "#991b1b", fontSize: 12, fontWeight: "bold" }}>{fieldError}</Text>
+        </View>
+      ) : null}
 
       <TextInput
         autoCapitalize="none"
@@ -444,8 +558,10 @@ function EmailAuth({
         value={password}
         onChangeText={setPassword}
       />
-      <Pressable style={styles.btn} onPress={submit}>
-        <Text style={styles.btnText}>{mode === "in" ? "Sign In" : "Register"}</Text>
+      <Pressable style={styles.btn} onPress={submit} disabled={busy}>
+        <Text style={styles.btnText}>
+          {busy ? (mode === "in" ? "Signing In..." : "Creating Account...") : mode === "in" ? "Sign In" : "Register"}
+        </Text>
       </Pressable>
       <Pressable onPress={() => setMode(mode === "in" ? "up" : "in")}>
         <Text style={styles.link}>
@@ -459,14 +575,17 @@ function EmailAuth({
 function PhoneAuth({
   onBack,
   onError,
+  onSuccess,
 }: {
   onBack: () => void;
   onError: (m: string | null) => void;
+  onSuccess: () => Promise<void>;
 }) {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [sent, setSent] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   function validatePhone() {
     setFieldError(null);
@@ -480,10 +599,22 @@ function PhoneAuth({
 
   async function send() {
     if (!validatePhone()) return;
+    setBusy(true);
+    setFieldError(null);
     onError(null);
-    const { error } = await supabase.auth.signInWithOtp({ phone: toE164India(phone) });
-    if (error) onError(error.message);
-    else setSent(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ phone: toE164India(phone) });
+      setBusy(false);
+      if (error) {
+        setFieldError(error.message);
+        onError(error.message);
+      } else {
+        setSent(true);
+      }
+    } catch (e) {
+      setBusy(false);
+      setFieldError(e instanceof Error ? e.message : "Failed to send OTP");
+    }
   }
 
   async function verify() {
@@ -491,13 +622,26 @@ function PhoneAuth({
       setFieldError("Please enter the received OTP");
       return;
     }
+    setBusy(true);
+    setFieldError(null);
     onError(null);
-    const { error } = await supabase.auth.verifyOtp({
-      phone: toE164India(phone),
-      token: otp.trim(),
-      type: "sms",
-    });
-    if (error) onError(error.message);
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone: toE164India(phone),
+        token: otp.trim(),
+        type: "sms",
+      });
+      setBusy(false);
+      if (error) {
+        setFieldError(error.message);
+        onError(error.message);
+      } else if (data.session) {
+        await onSuccess();
+      }
+    } catch (e) {
+      setBusy(false);
+      setFieldError(e instanceof Error ? e.message : "Verification failed");
+    }
   }
 
   return (
@@ -506,8 +650,13 @@ function PhoneAuth({
         <Text style={styles.link}>← Back to sign-in options</Text>
       </Pressable>
       <Text style={styles.h1}>Phone OTP</Text>
-      <Text style={styles.muted}>Fast passwordless sign in via SMS.</Text>
-      {fieldError ? <Text style={styles.errorText}>{fieldError}</Text> : null}
+      <Text style={styles.muted}>Passwordless sign in with 10-digit Indian mobile number.</Text>
+
+      {fieldError ? (
+        <View style={{ backgroundColor: "#fee2e2", padding: 10, borderRadius: 10, marginBottom: 10 }}>
+          <Text style={{ color: "#991b1b", fontSize: 12, fontWeight: "bold" }}>{fieldError}</Text>
+        </View>
+      ) : null}
 
       <TextInput
         keyboardType="phone-pad"
@@ -527,13 +676,13 @@ function PhoneAuth({
             value={otp}
             onChangeText={setOtp}
           />
-          <Pressable style={styles.btn} onPress={verify}>
-            <Text style={styles.btnText}>Verify &amp; Enter</Text>
+          <Pressable style={styles.btn} onPress={verify} disabled={busy}>
+            <Text style={styles.btnText}>{busy ? "Verifying..." : "Verify & Enter"}</Text>
           </Pressable>
         </>
       ) : (
-        <Pressable style={styles.btn} onPress={send}>
-          <Text style={styles.btnText}>Send SMS OTP</Text>
+        <Pressable style={styles.btn} onPress={send} disabled={busy}>
+          <Text style={styles.btnText}>{busy ? "Sending OTP..." : "Send SMS OTP"}</Text>
         </Pressable>
       )}
     </ScrollView>
@@ -559,6 +708,7 @@ function ProfileScreen({
   const [roll, setRoll] = useState(profile.roll_number ?? "");
   const [picked, setPicked] = useState<string[]>([]);
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -597,6 +747,7 @@ function ProfileScreen({
 
   async function save() {
     if (!validate()) return;
+    setBusy(true);
     onError(null);
     try {
       await saveProfile({
@@ -610,8 +761,10 @@ function ProfileScreen({
         email: profile.email,
         subjectIds: picked,
       });
+      setBusy(false);
       await onSaved();
     } catch (e) {
+      setBusy(false);
       onError(e instanceof Error ? e.message : "Could not save");
     }
   }
@@ -670,8 +823,8 @@ function ProfileScreen({
           );
         })}
       </View>
-      <Pressable style={styles.btn} onPress={save}>
-        <Text style={styles.btnText}>Save Details</Text>
+      <Pressable style={styles.btn} onPress={save} disabled={busy}>
+        <Text style={styles.btnText}>{busy ? "Saving..." : "Save Details"}</Text>
       </Pressable>
     </ScrollView>
   );
