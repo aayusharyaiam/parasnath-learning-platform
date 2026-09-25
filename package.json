@@ -5,7 +5,9 @@
   "scripts": {
     "dev:web": "pnpm --filter web dev",
     "dev:mobile": "pnpm --filter mobile start",
-    "build:web": "pnpm --filter web build"
+    "build:web": "pnpm --filter web build",
+    "lint": "pnpm --filter web lint",
+    "typecheck": "pnpm -r --if-present run typecheck"
   },
   "engines": {
     "node": ">=20"

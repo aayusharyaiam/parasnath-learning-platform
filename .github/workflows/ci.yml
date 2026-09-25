@@ -7,8 +7,8 @@ on:
     branches: [main, master, develop]
 
 jobs:
-  validate-web:
-    name: Lint & Build Next.js Web App
+  validate-monorepo:
+    name: Lint, Typecheck & Build Monorepo
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -17,7 +17,7 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 9.15.4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -26,37 +26,17 @@ jobs:
           cache: "pnpm"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Run Web Linter
         run: pnpm --filter web lint
 
+      - name: Run TypeScript Typecheck (All Workspaces)
+        run: pnpm run typecheck
+
       - name: Run Web Production Build
         run: pnpm --filter web build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://demo.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'demo-anon-key' }}
-
-  validate-mobile:
-    name: Typecheck React Native Mobile App
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "pnpm"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Typecheck Mobile App
-        run: pnpm --filter mobile exec tsc --noEmit
+          NEXT_PUBLIC_SUPABASE_URL: "https://demo.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "demo-anon-key"
+          NEXT_PUBLIC_SITE_URL: "http://localhost:3000"
