@@ -377,6 +377,13 @@ function AuthHub({
       setBusy(false);
       if (result.type === "success" && result.url) {
         const parsed = Linking.parse(result.url);
+        
+        const errorDesc = parsed.queryParams?.error_description;
+        if (errorDesc) {
+          onError(Array.isArray(errorDesc) ? errorDesc[0] : errorDesc.replace(/\+/g, ' '));
+          return;
+        }
+        
         const code = parsed.queryParams?.code;
         const codeStr = Array.isArray(code) ? code[0] : code;
         if (codeStr) {
