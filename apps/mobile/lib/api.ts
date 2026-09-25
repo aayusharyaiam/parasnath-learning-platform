@@ -12,61 +12,97 @@ import type {
 import { supabase } from "./supabase";
 
 export async function fetchProfile(): Promise<Profile | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data } = await supabase
-    .from("profiles")
-    .select(
-      "id, email, phone, full_name, role, class_id, section, roll_number, school_name, profile_completed_at",
-    )
-    .eq("id", user.id)
-    .maybeSingle();
-  return (data as Profile | null) ?? null;
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data } = await supabase
+      .from("profiles")
+      .select(
+        "id, email, phone, full_name, role, class_id, section, roll_number, school_name, profile_completed_at",
+      )
+      .eq("id", user.id)
+      .maybeSingle();
+    return (data as Profile | null) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchClasses(): Promise<SchoolClass[]> {
-  const { data } = await supabase.from("classes").select("id, name, grade").order("grade");
-  return (data as SchoolClass[]) ?? [];
+  try {
+    const { data } = await supabase.from("classes").select("id, name, grade").order("grade");
+    return (data as SchoolClass[]) ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchSubjects(): Promise<Subject[]> {
-  const { data } = await supabase.from("subjects").select("id, name").order("name");
-  return (data as Subject[]) ?? [];
+  try {
+    const { data } = await supabase.from("subjects").select("id, name").order("name");
+    return (data as Subject[]) ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchChapters(): Promise<Chapter[]> {
-  const { data } = await supabase.from("chapters").select("id, class_id, subject_id, title, sort_order").order("sort_order");
-  return (data as Chapter[]) ?? [];
+  try {
+    const { data } = await supabase.from("chapters").select("id, class_id, subject_id, title, sort_order").order("sort_order");
+    return (data as Chapter[]) ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchMaterials(): Promise<Material[]> {
-  const { data } = await supabase.from("materials").select("*").order("created_at", { ascending: false });
-  return (data as Material[]) ?? [];
+  try {
+    const { data } = await supabase.from("materials").select("*").order("created_at", { ascending: false });
+    return (data as Material[]) ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchQuestions(): Promise<Question[]> {
-  const { data } = await supabase.from("questions").select("*").order("created_at", { ascending: false });
-  return (data as Question[]) ?? [];
+  try {
+    const { data } = await supabase.from("questions").select("*").order("created_at", { ascending: false });
+    return (data as Question[]) ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchVideoLectures(): Promise<VideoLecture[]> {
-  const { data } = await supabase.from("video_lectures").select("*").order("created_at", { ascending: false });
-  return (data as VideoLecture[]) ?? [];
+  try {
+    const { data } = await supabase.from("video_lectures").select("*").order("created_at", { ascending: false });
+    return (data as VideoLecture[]) ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchQuestionPapers(): Promise<QuestionPaper[]> {
-  const { data } = await supabase.from("question_papers").select("*").order("created_at", { ascending: false });
-  return (data as QuestionPaper[]) ?? [];
+  try {
+    const { data } = await supabase.from("question_papers").select("*").order("created_at", { ascending: false });
+    return (data as QuestionPaper[]) ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchSubjectIds(profileId: string): Promise<string[]> {
-  const { data } = await supabase
-    .from("profile_subjects")
-    .select("subject_id")
-    .eq("profile_id", profileId);
-  return (data ?? []).map((r) => r.subject_id as string);
+  try {
+    const { data } = await supabase
+      .from("profile_subjects")
+      .select("subject_id")
+      .eq("profile_id", profileId);
+    return (data ?? []).map((r) => r.subject_id as string);
+  } catch {
+    return [];
+  }
 }
 
 export async function saveProfile(input: {
@@ -108,13 +144,17 @@ export async function saveProfile(input: {
 }
 
 export async function fetchStudents() {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("full_name, phone, section, school_name, role")
-    .eq("role", "student")
-    .order("full_name");
-  if (error) throw error;
-  return data ?? [];
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("full_name, phone, section, school_name, role")
+      .eq("role", "student")
+      .order("full_name");
+    if (error) throw error;
+    return data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function updateRole(id: string, role: UserRole) {
@@ -123,10 +163,14 @@ export async function updateRole(id: string, role: UserRole) {
 }
 
 export async function fetchUsers() {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, full_name, email, phone, role")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, email, phone, role")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  } catch {
+    return [];
+  }
 }

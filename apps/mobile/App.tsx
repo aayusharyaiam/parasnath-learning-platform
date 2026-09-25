@@ -73,19 +73,25 @@ export default function App() {
   const [showCrisis, setShowCrisis] = useState(false);
 
   const refresh = useCallback(async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        setProfile(null);
+        setScreen("hub");
+        setReady(true);
+        return;
+      }
+      const p = await fetchProfile();
+      setProfile(p);
+      setScreen(isProfileComplete(p) ? "home" : "profile");
+    } catch {
       setProfile(null);
       setScreen("hub");
+    } finally {
       setReady(true);
-      return;
     }
-    const p = await fetchProfile();
-    setProfile(p);
-    setScreen(isProfileComplete(p) ? "home" : "profile");
-    setReady(true);
   }, []);
 
   useEffect(() => {
@@ -94,11 +100,16 @@ export default function App() {
       setReady(true);
       return;
     }
+    // Safety timeout: ensure ready is set within 2s even if network is slow
+    const timer = setTimeout(() => setReady(true), 2000);
     void refresh();
     const { data: sub } = supabase.auth.onAuthStateChange(() => {
       void refresh();
     });
-    return () => sub.subscription.unsubscribe();
+    return () => {
+      clearTimeout(timer);
+      sub.subscription.unsubscribe();
+    };
   }, [refresh]);
 
   if (!ready) {
