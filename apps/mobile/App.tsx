@@ -122,7 +122,21 @@ export default function App() {
         setReady(true);
         return;
       }
-      const p = await fetchProfile();
+      let p = await fetchProfile();
+      if (!p) {
+        p = {
+          id: session.user.id,
+          email: session.user.email || null,
+          phone: session.user.phone || null,
+          full_name: session.user.user_metadata?.full_name || "",
+          role: "student",
+          class_id: null,
+          section: null,
+          roll_number: null,
+          school_name: null,
+          profile_completed_at: null,
+        } as any;
+      }
       setProfile(p);
       setScreen(isProfileComplete(p) ? "home" : "profile");
     } catch {
