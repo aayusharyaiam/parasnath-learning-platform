@@ -14,7 +14,12 @@ export default async function AppLayout({
   const user = await getSessionUser();
   if (!user) redirect("/login");
   const profile = await getProfile();
-  if (!profile || !isProfileComplete(profile)) redirect("/complete-profile");
+  if (!profile) redirect("/login");
+
+  // Only students who haven't completed their profile get redirected
+  if (profile.role === "student" && !isProfileComplete(profile)) {
+    redirect("/complete-profile");
+  }
 
   const nav = navForRole(profile.role);
 

@@ -1,4 +1,5 @@
 import { RoleSelect } from "./role-select";
+import { CreateUserForm } from "./create-user-form";
 import { DEMO_PROFILES, getProfile } from "@/lib/data";
 import { hasSupabaseConfig } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
@@ -34,6 +35,8 @@ export default async function AdminUsersPage() {
           Promote or assign permissions for teachers, students, and school administrators.
         </p>
       </div>
+
+      <CreateUserForm />
 
       <div className="overflow-x-auto rounded-3xl border border-card-border bg-card shadow-xs">
         <table className="w-full text-left text-xs" aria-label="Users Access Management">

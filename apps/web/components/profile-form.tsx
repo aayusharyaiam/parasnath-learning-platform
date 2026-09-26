@@ -16,6 +16,8 @@ type Props = {
   classes: SchoolClass[];
   subjects: Subject[];
   selectedSubjectIds: string[];
+  initialEmail?: string;
+  initialPhone?: string;
   submitLabel?: string;
 };
 
@@ -24,11 +26,14 @@ export function ProfileForm({
   classes,
   subjects,
   selectedSubjectIds,
+  initialEmail = "",
+  initialPhone = "",
   submitLabel = "Save Profile",
 }: Props) {
   const router = useRouter();
   const [fullName, setFullName] = useState(profile.full_name ?? "");
-  const [phone, setPhone] = useState(profile.phone?.replace(/^\+91/, "") ?? "");
+  const [email] = useState(profile.email ?? initialEmail);
+  const [phone, setPhone] = useState((profile.phone ?? initialPhone).replace(/^\+91/, ""));
   const [classId, setClassId] = useState(profile.class_id ?? classes[0]?.id ?? "");
   const [section, setSection] = useState(profile.section ?? "");
   const [schoolName, setSchoolName] = useState(
@@ -39,7 +44,9 @@ export function ProfileForm({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const isStudent = profile.role === "student";
 
   function validate() {
     const errs: Record<string, string> = {};
@@ -48,21 +55,20 @@ export function ProfileForm({
       errs.fullName = "Please enter your full name (minimum 2 characters).";
     }
 
-    const cleanedPhone = phone.replace(/\D/g, "");
-    if (!cleanedPhone || cleanedPhone.length !== 10 || !/^[6-9]\d{9}$/.test(cleanedPhone)) {
-      errs.phone = "Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).";
-    }
-
-    if (!classId) {
-      errs.classId = "Please select your class.";
-    }
-
-    if (!section.trim()) {
-      errs.section = "Please enter your section (e.g. A, B, or C).";
-    }
-
-    if (!schoolName.trim()) {
-      errs.schoolName = "Please specify your school name.";
+    if (isStudent) {
+      const cleanedPhone = phone.replace(/\D/g, "");
+      if (!cleanedPhone || cleanedPhone.length !== 10 || !/^[6-9]\d{9}$/.test(cleanedPhone)) {
+        errs.phone = "Please enter a valid 10-digit Indian mobile number (e.g. 9876543210).";
+      }
+      if (!classId) {
+        errs.classId = "Please select your class.";
+      }
+      if (!section.trim()) {
+        errs.section = "Please enter your section (e.g. A, B, or C).";
+      }
+      if (!schoolName.trim()) {
+        errs.schoolName = "Please specify your school name.";
+      }
     }
 
     setErrors(errs);
@@ -81,49 +87,72 @@ export function ProfileForm({
 
     setBusy(true);
     setServerError(null);
+    setSuccessMsg(null);
 
     try {
       const supabase = createClient();
-      const e164 = toE164India(phone);
 
-      const { error: err } = await supabase
+      const updateData: Record<string, unknown> = {
+        full_name: fullName.trim(),
+        email: email.trim() || profile.email,
+      };
+
+      if (isStudent) {
+        const e164 = toE164India(phone);
+        updateData.phone = e164;
+        updateData.class_id = classId;
+        updateData.section = section.trim().toUpperCase();
+        updateData.school_name = schoolName.trim();
+        updateData.roll_number = rollNumber.trim() || null;
+        updateData.profile_completed_at = new Date().toISOString();
+      }
+
+      const { data: saved, error: err } = await supabase
         .from("profiles")
-        .update({
-          full_name: fullName.trim(),
-          phone: e164,
-          class_id: classId,
-          section: section.trim().toUpperCase(),
-          school_name: schoolName.trim(),
-          roll_number: rollNumber.trim() || null,
-          profile_completed_at: new Date().toISOString(),
-          email: profile.email,
-        })
-        .eq("id", profile.id);
+        .update(updateData)
+        .eq("id", profile.id)
+        .select("id")
+        .maybeSingle();
 
       if (err) {
         setBusy(false);
         setServerError(err.message);
         return;
       }
-
-      await supabase.from("profile_subjects").delete().eq("profile_id", profile.id);
-      if (picked.length) {
-        const { error: subErr } = await supabase.from("profile_subjects").insert(
-          picked.map((subject_id) => ({
-            profile_id: profile.id,
-            subject_id,
-          })),
-        );
-        if (subErr) {
-          setBusy(false);
-          setServerError(subErr.message);
-          return;
-        }
+      if (!saved) {
+        setBusy(false);
+        setServerError("Profile was not saved. Your account may not have permission to update this profile.");
+        return;
       }
 
-      setBusy(false);
-      router.replace("/app");
-      router.refresh();
+      if (isStudent) {
+        const { error: deleteError } = await supabase.from("profile_subjects").delete().eq("profile_id", profile.id);
+        if (deleteError) {
+          setBusy(false);
+          setServerError(deleteError.message);
+          return;
+        }
+        if (picked.length) {
+          const { error: subErr } = await supabase.from("profile_subjects").insert(
+            picked.map((subject_id) => ({
+              profile_id: profile.id,
+              subject_id,
+            })),
+          );
+          if (subErr) {
+            setBusy(false);
+            setServerError(subErr.message);
+            return;
+          }
+        }
+        setBusy(false);
+        router.replace("/app");
+        router.refresh();
+      } else {
+        setBusy(false);
+        setSuccessMsg("Profile saved successfully!");
+        router.refresh();
+      }
     } catch (e) {
       setBusy(false);
       setServerError(e instanceof Error ? e.message : "Failed to update profile");
@@ -138,6 +167,15 @@ export function ProfileForm({
           className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-900"
         >
           {serverError}
+        </div>
+      ) : null}
+
+      {successMsg ? (
+        <div
+          role="status"
+          className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-900"
+        >
+          {successMsg}
         </div>
       ) : null}
 
@@ -171,7 +209,25 @@ export function ProfileForm({
         )}
       </div>
 
-      {/* Phone Number */}
+      {isStudent ? (
+      <>
+      <div className="space-y-1">
+        <label htmlFor="prof-email" className="text-xs font-bold text-foreground">
+          Email Address
+        </label>
+        <input
+          id="prof-email"
+          type="email"
+          value={email}
+          readOnly
+          className="w-full rounded-xl border border-card-border bg-muted/30 px-3.5 py-2.5 text-sm font-normal text-foreground"
+          placeholder="Filled from your sign-in method"
+        />
+        <p className="text-[11px] text-muted-foreground">
+          This is the email connected to your account.
+        </p>
+      </div>
+
       <div className="space-y-1">
         <label htmlFor="prof-phone" className="text-xs font-bold text-foreground">
           Mobile Number (India +91) <span className="text-red-500">*</span>
@@ -206,7 +262,15 @@ export function ProfileForm({
           </p>
         )}
       </div>
+      </>
+      ) : (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          <strong>Phone / OTP Sign-In:</strong> To link a phone number and enable OTP login, use the <em>Account Security</em> section below — it sends a real verification OTP so Supabase Auth records the number.
+        </div>
+      )}
 
+      {isStudent ? (
+      <>
       {/* Class and Section row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1">
@@ -340,13 +404,15 @@ export function ProfileForm({
                     : "border border-card-border bg-card text-foreground hover:border-brand/40"
                 }`}
               >
-                {on ? "✓ " : "+ "}
+                {on ? "o " : "+ "}
                 {s.name}
               </button>
             );
           })}
         </div>
-      </fieldset>
+       </fieldset>
+       </>
+      ) : null}
 
       {profile.role !== "student" ? (
         <div className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900 border border-amber-200">

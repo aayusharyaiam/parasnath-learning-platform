@@ -378,6 +378,17 @@ export const DEMO_PROFILES: Record<string, Profile> = {
 };
 
 export async function getSessionUser() {
+  if (!hasSupabaseConfig()) return null;
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) return user;
+  } catch {
+    // Ignore error
+  }
+
   const cookieStore = await cookies();
   const demoRole = cookieStore.get("parasnath_demo_user")?.value;
   if (demoRole && DEMO_PROFILES[demoRole]) {
@@ -389,49 +400,40 @@ export async function getSessionUser() {
       user_metadata: { full_name: p.full_name },
     };
   }
-
-  if (!hasSupabaseConfig()) return null;
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    return user;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 import { unstable_noStore } from "next/cache";
 
 export async function getProfile(): Promise<Profile | null> {
   unstable_noStore();
-  const cookieStore = await cookies();
-  const demoRole = cookieStore.get("parasnath_demo_user")?.value;
-  if (demoRole && DEMO_PROFILES[demoRole]) {
-    return DEMO_PROFILES[demoRole];
-  }
-
   if (!hasSupabaseConfig()) return null;
   try {
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return null;
 
-    const { data } = await supabase
-      .from("profiles")
-      .select(
-        "id, email, phone, full_name, role, class_id, section, roll_number, school_name, profile_completed_at",
-      )
-      .eq("id", user.id)
-      .maybeSingle();
-
-    return (data as Profile | null) ?? null;
+    if (user) {
+      const { data } = await supabase
+        .from("profiles")
+        .select(
+          "id, email, phone, full_name, role, class_id, section, roll_number, school_name, profile_completed_at",
+        )
+        .eq("id", user.id)
+        .maybeSingle();
+      return (data as Profile | null) ?? null;
+    }
   } catch {
-    return null;
+    // Ignore error
   }
+
+  const cookieStore = await cookies();
+  const demoRole = cookieStore.get("parasnath_demo_user")?.value;
+  if (demoRole && DEMO_PROFILES[demoRole]) {
+    return DEMO_PROFILES[demoRole];
+  }
+  return null;
 }
 
 export async function getClasses(): Promise<SchoolClass[]> {

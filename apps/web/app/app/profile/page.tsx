@@ -1,13 +1,14 @@
 import { ProfileForm } from "@/components/profile-form";
 import { AccountSecurity } from "@/components/account-security";
-import { getClasses, getProfile, getSubjects } from "@/lib/data";
+import { getClasses, getProfile, getSessionUser, getSubjects } from "@/lib/data";
 import { hasSupabaseConfig } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 export default async function ProfilePage() {
   const profile = await getProfile();
-  if (!profile) redirect("/login");
+  const user = await getSessionUser();
+  if (!profile || !user) redirect("/login");
   const [classes, subjects] = await Promise.all([getClasses(), getSubjects()]);
 
   let selectedSubjectIds: string[] = [];
@@ -42,6 +43,8 @@ export default async function ProfilePage() {
           classes={classes}
           subjects={subjects}
           selectedSubjectIds={selectedSubjectIds}
+          initialEmail={profile.email ?? user.email ?? ""}
+          initialPhone={profile.phone ?? user.phone ?? ""}
         />
       </div>
 

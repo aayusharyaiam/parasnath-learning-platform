@@ -135,6 +135,22 @@ export function toE164India(phone: string): string {
   return `+91${digits}`;
 }
 
+export function friendlyError(error: unknown, fallback = "Something went wrong. Please try again."): string {
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("invalid login credentials")) return "That email or password is not correct. Please try again.";
+  if (normalized.includes("email not confirmed")) return "Please confirm your email from the message sent to your inbox, then sign in again.";
+  if (normalized.includes("user already registered") || normalized.includes("already been registered")) return "An account already exists with this email. Please sign in instead.";
+  if (normalized.includes("phone") && normalized.includes("already")) return "This mobile number is already linked to another account.";
+  if (normalized.includes("otp") && (normalized.includes("invalid") || normalized.includes("expired"))) return "That verification code is invalid or has expired. Request a new code and try again.";
+  if (normalized.includes("rate limit") || normalized.includes("too many")) return "Too many attempts were made. Please wait a few minutes and try again.";
+  if (normalized.includes("network") || normalized.includes("fetch") || normalized.includes("failed to fetch")) return "We could not reach the server. Check your internet connection and try again.";
+  if (normalized.includes("permission") || normalized.includes("row-level security") || normalized.includes("not authorized")) return "We could not save this change. Please sign in again and try once more.";
+
+  return message || fallback;
+}
+
 export function isProfileComplete(profile: Profile | null): boolean {
   if (!profile) return false;
   if (profile.role === "admin" || profile.role === "teacher") return true;

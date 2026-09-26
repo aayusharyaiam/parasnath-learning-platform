@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { friendlyError } from "@parasnath/shared";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SiteHeader } from "@/components/site-header";
@@ -50,7 +51,7 @@ export default function EmailLoginPage() {
     setBusy(false);
 
     if (err) {
-      setServerError(err.message);
+      setServerError(friendlyError(err));
       return;
     }
 

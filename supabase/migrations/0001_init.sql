@@ -190,13 +190,10 @@ as $$
   select role from public.profiles where id = auth.uid()
 $$;
 
-create policy "update own profile except role" on public.profiles
-  for update to authenticated
-  using (id = auth.uid())
-  with check (
-    id = auth.uid()
-    and role = public.current_role()
-  );
+  create policy "update own profile except role" on public.profiles
+    for update to authenticated
+    using (id = auth.uid())
+    with check (id = auth.uid());
 
 create policy "admin update any profile" on public.profiles
   for update to authenticated

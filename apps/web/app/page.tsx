@@ -11,7 +11,9 @@ export default async function HomePage() {
   const user = await getSessionUser();
   if (user) {
     const profile = await getProfile();
-    if (isProfileComplete(profile)) redirect("/app");
+    if (profile?.role === "admin" || profile?.role === "teacher" || isProfileComplete(profile)) {
+      redirect("/app");
+    }
     redirect("/complete-profile");
   }
 
@@ -52,7 +54,7 @@ export default async function HomePage() {
                 href="/register"
                 className="rounded-full border-2 border-brand/30 bg-card px-7 py-3 text-sm font-bold text-brand-dark transition-all hover:border-brand hover:bg-brand-light/30 focus-visible:ring-2 focus-visible:ring-brand"
               >
-                Create Student / Teacher Account
+                Create Student Account
               </Link>
             </div>
 

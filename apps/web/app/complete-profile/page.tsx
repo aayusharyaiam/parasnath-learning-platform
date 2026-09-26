@@ -19,7 +19,14 @@ export default async function CompleteProfilePage() {
 
   const profile = await getProfile();
   if (!profile) redirect("/login");
-  if (isProfileComplete(profile)) redirect("/app");
+
+  if (profile.role === "admin" || profile.role === "teacher") {
+    redirect("/app");
+  }
+
+  if (isProfileComplete(profile)) {
+    redirect("/app");
+  }
 
   const [classes, subjects] = await Promise.all([getClasses(), getSubjects()]);
   const supabase = await createClient();
@@ -47,6 +54,8 @@ export default async function CompleteProfilePage() {
             classes={classes}
             subjects={subjects}
             selectedSubjectIds={(rows ?? []).map((r) => r.subject_id)}
+            initialEmail={profile.email ?? user.email ?? ""}
+            initialPhone={profile.phone ?? user.phone ?? ""}
             submitLabel="Save & Enter Learning App"
           />
         </div>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { toE164India } from "@parasnath/shared";
+import { friendlyError, toE164India } from "@parasnath/shared";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SiteHeader } from "@/components/site-header";
@@ -52,7 +52,7 @@ export default function PhoneLoginPage() {
       setBusy(false);
 
       if (err) {
-        setServerError(err.message);
+        setServerError(friendlyError(err));
         return;
       }
       setSent(true);
@@ -79,7 +79,7 @@ export default function PhoneLoginPage() {
       setBusy(false);
 
       if (err) {
-        setServerError(err.message);
+        setServerError(friendlyError(err));
         return;
       }
 

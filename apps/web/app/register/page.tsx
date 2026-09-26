@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { friendlyError, toE164India } from "@parasnath/shared";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
@@ -10,6 +11,7 @@ import { SiteFooter } from "@/components/site-footer";
 export default function RegisterPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -33,6 +35,12 @@ export default function RegisterPage() {
 
     if (!password || password.length < 6) {
       setPasswordError("Password must be at least 6 characters long.");
+      valid = false;
+    }
+
+    const cleanedPhone = phone.replace(/\D/g, "");
+    if (cleanedPhone && (cleanedPhone.length !== 10 || !/^[6-9]\d{9}$/.test(cleanedPhone))) {
+      setServerError("Enter a valid 10-digit Indian phone number, or leave it blank.");
       valid = false;
     }
 
@@ -60,12 +68,17 @@ export default function RegisterPage() {
     const { data, error: err } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { emailRedirectTo: `${origin}/auth/callback` },
+      options: {
+        emailRedirectTo: `${origin}/auth/callback`,
+        data: {
+          phone: phone.trim() ? toE164India(phone) : null,
+        },
+      },
     });
     setBusy(false);
 
     if (err) {
-      setServerError(err.message);
+      setServerError(friendlyError(err));
       return;
     }
 
@@ -87,13 +100,13 @@ export default function RegisterPage() {
       >
         <div className="rounded-3xl border border-card-border bg-card p-6 sm:p-8 shadow-xs">
           <span className="text-[11px] font-bold uppercase tracking-wider text-brand">
-            Student &amp; Teacher Registration
+             Create a student account
           </span>
           <h1 className="mt-1 text-2xl font-extrabold text-brand-dark">
             Create Account
           </h1>
           <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
-            Create your account to access NCERT Class 9 &amp; 10 learning materials, tests, and AI tools.
+             Create your account to access NCERT Class 9 &amp; 10 learning materials, tests, and AI tools.
           </p>
 
           {serverError ? (
@@ -147,9 +160,27 @@ export default function RegisterPage() {
               )}
             </div>
 
-            <div className="space-y-1">
-              <label
-                htmlFor="reg-password"
+             <div className="space-y-1">
+               <label htmlFor="reg-phone" className="text-xs font-bold text-foreground">
+                 Mobile Number (optional)
+               </label>
+               <input
+                 id="reg-phone"
+                 type="tel"
+                 inputMode="numeric"
+                 maxLength={10}
+                 autoComplete="tel"
+                 value={phone}
+                 onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                 className="w-full rounded-xl border border-card-border bg-background px-3.5 py-2.5 text-sm font-normal text-foreground"
+                 placeholder="9876543210"
+               />
+               <p className="text-[11px] text-muted-foreground">You can also link and verify a phone after signing in.</p>
+             </div>
+
+             <div className="space-y-1">
+               <label
+                 htmlFor="reg-password"
                 className="text-xs font-bold text-foreground"
               >
                 Password (min 6 characters)

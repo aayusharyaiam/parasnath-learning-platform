@@ -1,9 +1,10 @@
 import { StatusBar } from "expo-status-bar";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Alert,
   Modal,
   Pressable,
@@ -14,6 +15,7 @@ import {
   View,
 } from "react-native";
 import {
+  friendlyError,
   isProfileComplete,
   navForRole,
   SCHOOL_DEFAULT_NAME,
@@ -137,8 +139,13 @@ export default function App() {
           profile_completed_at: null,
         } as any;
       }
-      setProfile(p);
-      setScreen(isProfileComplete(p) ? "home" : "profile");
+      const syncedProfile = {
+        ...p,
+        email: p!.email ?? session.user.email ?? null,
+        phone: p!.phone ?? session.user.phone ?? null,
+      } as Profile;
+      setProfile(syncedProfile);
+      setScreen(isProfileComplete(syncedProfile) ? "home" : "profile");
     } catch {
       setProfile(null);
       setScreen("hub");
@@ -149,7 +156,7 @@ export default function App() {
 
   useEffect(() => {
     if (!hasSupabaseConfig()) {
-      setError("Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to apps/mobile/.env");
+      setError("The app is temporarily unavailable. Please contact your school administrator.");
       setReady(true);
       return;
     }
@@ -178,13 +185,13 @@ export default function App() {
   return (
     <View style={styles.root}>
       <StatusBar style="dark" />
-      {error ? <Text style={styles.banner}>{error}</Text> : null}
+      {error ? <Notice message={error} onClose={() => setError(null)} /> : null}
 
       {/* Global Student Crisis Modal */}
       <CrisisModal visible={showCrisis} onClose={() => setShowCrisis(false)} />
 
       {screen === "hub" ? (
-        <AuthHub
+        <ScreenEntrance><AuthHub
           onEmail={() => setScreen("email")}
           onPhone={() => setScreen("phone")}
           onDemoSelect={(role) => {
@@ -197,14 +204,14 @@ export default function App() {
           onFaq={() => setScreen("faq")}
           onPrivacy={() => setScreen("privacy")}
           onCrisis={() => setShowCrisis(true)}
-          onError={setError}
-        />
+          onError={(message) => setError(message ? friendlyError(message) : null)}
+        /></ScreenEntrance>
       ) : null}
 
       {screen === "email" ? (
         <EmailAuth
           onBack={() => setScreen("hub")}
-          onError={setError}
+          onError={(message) => setError(message ? friendlyError(message) : null)}
           onSuccess={refresh}
         />
       ) : null}
@@ -212,13 +219,13 @@ export default function App() {
       {screen === "phone" ? (
         <PhoneAuth
           onBack={() => setScreen("hub")}
-          onError={setError}
+          onError={(message) => setError(message ? friendlyError(message) : null)}
           onSuccess={refresh}
         />
       ) : null}
 
       {screen === "profile" && profile ? (
-        <ProfileScreen profile={profile} onError={setError} onSaved={refresh} />
+        <ProfileScreen profile={profile} onError={(message) => setError(message ? friendlyError(message) : null)} onSaved={refresh} />
       ) : null}
 
       {screen === "home" && profile ? (
@@ -315,6 +322,34 @@ export default function App() {
   );
 }
 
+function Notice({ message, onClose }: { message: string; onClose: () => void }) {
+  return (
+    <View style={styles.notice} accessibilityRole="alert">
+      <View style={styles.noticeTextWrap}>
+        <Text style={styles.noticeTitle}>Please try again</Text>
+        <Text style={styles.noticeText}>{message}</Text>
+      </View>
+      <Pressable onPress={onClose} hitSlop={10} style={({ pressed }) => [styles.noticeClose, pressed && styles.pressed]}>
+        <Text style={styles.noticeCloseText}>Close</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function ScreenEntrance({ children }: { children: React.ReactNode }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(14)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 260, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 260, useNativeDriver: true }),
+    ]).start();
+  }, [opacity, translateY]);
+
+  return <Animated.View style={{ opacity, transform: [{ translateY }] }}>{children}</Animated.View>;
+}
+
 function CrisisModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   function callNumber(num: string) {
     void Linking.openURL(`tel:${num}`);
@@ -383,7 +418,7 @@ function AuthHub({
         options: { redirectTo, skipBrowserRedirect: true },
       });
       if (error || !data.url) {
-        onError(error?.message ?? "Google sign-in failed");
+        onError(friendlyError(error?.message ?? "Google sign-in failed"));
         setBusy(false);
         return;
       }
@@ -402,7 +437,7 @@ function AuthHub({
         const codeStr = Array.isArray(code) ? code[0] : code;
         if (codeStr) {
           const { error: exErr } = await supabase.auth.exchangeCodeForSession(codeStr);
-          if (exErr) onError(exErr.message);
+          if (exErr) onError(friendlyError(exErr));
         } else if (parsed.queryParams?.access_token && parsed.queryParams?.refresh_token) {
           const accessToken = Array.isArray(parsed.queryParams.access_token)
             ? parsed.queryParams.access_token[0]
@@ -414,12 +449,12 @@ function AuthHub({
             access_token: accessToken,
             refresh_token: refreshToken,
           });
-          if (setErr) onError(setErr.message);
+          if (setErr) onError(friendlyError(setErr));
         }
       }
     } catch (e) {
       setBusy(false);
-      onError(e instanceof Error ? e.message : "Google OAuth session failed");
+      onError(friendlyError(e, "Google sign-in could not be completed."));
     }
   }
 
@@ -524,8 +559,9 @@ function EmailAuth({
         });
         setBusy(false);
         if (error) {
-          setFieldError(error.message);
-          onError(error.message);
+          const message = friendlyError(error);
+          setFieldError(message);
+          onError(message);
           return;
         }
         if (data.session) {
@@ -538,8 +574,9 @@ function EmailAuth({
         });
         setBusy(false);
         if (error) {
-          setFieldError(error.message);
-          onError(error.message);
+          const message = friendlyError(error);
+          setFieldError(message);
+          onError(message);
         } else {
           Alert.alert("Account Created", "You can now sign in with your email and password.");
           setMode("in");
@@ -547,7 +584,7 @@ function EmailAuth({
       }
     } catch (e) {
       setBusy(false);
-      setFieldError(e instanceof Error ? e.message : "Sign-in failed");
+      setFieldError(friendlyError(e, "We could not sign you in. Please try again."));
     }
   }
 
@@ -634,7 +671,7 @@ function PhoneAuth({
       }
     } catch (e) {
       setBusy(false);
-      setFieldError(e instanceof Error ? e.message : "Failed to send OTP");
+      setFieldError(friendlyError(e, "We could not send the code. Please try again."));
     }
   }
 
@@ -661,7 +698,7 @@ function PhoneAuth({
       }
     } catch (e) {
       setBusy(false);
-      setFieldError(e instanceof Error ? e.message : "Verification failed");
+      setFieldError(friendlyError(e, "The code could not be verified. Please try again."));
     }
   }
 
@@ -722,6 +759,7 @@ function ProfileScreen({
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [fullName, setFullName] = useState(profile.full_name ?? "");
+  const [email, setEmail] = useState(profile.email ?? "");
   const [phone, setPhone] = useState(profile.phone?.replace(/^\+91/, "") ?? "");
   const [classId, setClassId] = useState(profile.class_id ?? "");
   const [section, setSection] = useState(profile.section ?? "");
@@ -745,6 +783,8 @@ function ProfileScreen({
     })();
   }, [profile.id]);
 
+  const isStudent = profile.role === "student";
+
   function validate() {
     setFieldError(null);
     if (!fullName.trim()) {
@@ -755,11 +795,11 @@ function ProfileScreen({
       setFieldError("Please enter a valid 10-digit phone number");
       return false;
     }
-    if (!section.trim()) {
+    if (isStudent && !section.trim()) {
       setFieldError("Please enter your section (e.g. A, B)");
       return false;
     }
-    if (!schoolName.trim()) {
+    if (isStudent && !schoolName.trim()) {
       setFieldError("Please enter your school name");
       return false;
     }
@@ -786,7 +826,7 @@ function ProfileScreen({
       await onSaved();
     } catch (e) {
       setBusy(false);
-      onError(e instanceof Error ? e.message : "Could not save");
+      onError(friendlyError(e, "We could not save your details. Please try again."));
     }
   }
 
@@ -798,6 +838,16 @@ function ProfileScreen({
       {fieldError ? <Text style={styles.errorText}>{fieldError}</Text> : null}
 
       <TextInput placeholder="Full name" style={styles.input} value={fullName} onChangeText={setFullName} />
+      {isStudent ? (
+        <TextInput
+          placeholder="Email address"
+          autoCapitalize="none"
+          keyboardType="email-address"
+          editable={false}
+          style={[styles.input, { opacity: 0.7 }]}
+          value={email}
+        />
+      ) : null}
       <TextInput
         keyboardType="phone-pad"
         maxLength={10}
@@ -806,6 +856,7 @@ function ProfileScreen({
         value={phone}
         onChangeText={setPhone}
       />
+      {isStudent ? <>
       <Text style={styles.label}>Class / Grade</Text>
       <View style={styles.rowWrap}>
         {classes.map((c) => (
@@ -837,13 +888,20 @@ function ProfileScreen({
               style={[styles.chip, on && styles.chipOn]}
             >
               <Text style={on ? styles.chipOnText : styles.chipText}>
-                {on ? "✓ " : "+ "}
+                {on ? "o " : "+ "}
                 {s.name}
               </Text>
             </Pressable>
           );
         })}
       </View>
+      </> : (
+        <View style={{ backgroundColor: "#fffbeb", padding: 12, borderRadius: 12, marginTop: 12, borderWidth: 1, borderColor: "#fde68a" }}>
+          <Text style={{ fontSize: 12, color: "#92400e" }}>
+            <Text style={{ fontWeight: "bold" }}>Assigned Role:</Text> {profile.role.toUpperCase()}
+          </Text>
+        </View>
+      )}
       <Pressable style={styles.btn} onPress={save} disabled={busy}>
         <Text style={styles.btnText}>{busy ? "Saving..." : "Save Details"}</Text>
       </Pressable>
@@ -1203,17 +1261,94 @@ function UsersScreen({ onBack }: { onBack: () => void }) {
   const [rows, setRows] = useState<
     { id: string; full_name: string | null; email: string | null; role: string }[]
   >([]);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  // New user form state
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPass, setNewPass] = useState("");
+  const [newRole, setNewRole] = useState<UserRole>("student");
+
   useEffect(() => {
+    loadUsers();
+  }, []);
+
+  function loadUsers() {
     void fetchUsers()
       .then((data) => setRows(data as typeof rows))
       .catch(() => setRows([]));
-  }, []);
+  }
+
+  async function createUser() {
+    setErrorMsg("");
+    setSuccessMsg("");
+    if (!newName.trim() || !newEmail.trim() || newPass.length < 8) {
+      setErrorMsg("Name, email, and a password (min 8 chars) are required.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("http://localhost:3000/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: newName,
+          email: newEmail,
+          password: newPass,
+          role: newRole,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || "We could not create this account. Please try again.");
+      }
+      setSuccessMsg("Account created successfully!");
+      setNewName("");
+      setNewEmail("");
+      setNewPass("");
+      loadUsers();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Error creating user");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.pad}>
       <Pressable onPress={onBack}>
-        <Text style={styles.link}>← Back to Home</Text>
+        <Text style={styles.link}>? Back to Home</Text>
       </Pressable>
-      <Text style={styles.h1}>User Role Manager</Text>
+
+      <View style={[styles.card, { marginTop: 24, backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" }]}>
+        <Text style={styles.cardTitle}>Create New Account</Text>
+        <TextInput placeholder="Full name" style={styles.input} value={newName} onChangeText={setNewName} />
+        <TextInput placeholder="Email address" keyboardType="email-address" autoCapitalize="none" style={styles.input} value={newEmail} onChangeText={setNewEmail} />
+        <TextInput placeholder="Temporary password (min 8)" secureTextEntry style={styles.input} value={newPass} onChangeText={setNewPass} />
+
+        <View style={[styles.rowWrap, { marginTop: 12 }]}>
+          {(["student", "teacher", "admin"] as UserRole[]).map((role) => (
+            <Pressable
+              key={role}
+              style={[styles.chip, newRole === role && styles.chipOn]}
+              onPress={() => setNewRole(role)}
+            >
+              <Text style={newRole === role ? styles.chipOnText : styles.chipText}>{role}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {errorMsg ? <Text style={{ color: "red", fontSize: 12, marginTop: 8 }}>{errorMsg}</Text> : null}
+        {successMsg ? <Text style={{ color: "green", fontSize: 12, marginTop: 8 }}>{successMsg}</Text> : null}
+
+        <Pressable style={[styles.btn, { marginTop: 16 }]} onPress={createUser} disabled={busy}>
+          <Text style={styles.btnText}>{busy ? "Creating..." : "Create Account"}</Text>
+        </Pressable>
+      </View>
+
+      <Text style={[styles.h1, { marginTop: 24 }]}>User Role Manager</Text>
       {rows.map((r) => (
         <View key={r.id} style={styles.card}>
           <Text style={styles.cardTitle}>{r.full_name ?? r.email ?? r.id}</Text>
@@ -1245,16 +1380,23 @@ const styles = StyleSheet.create({
   h1: { fontSize: 26, fontWeight: "800", color: "#0d382b", marginTop: 6, marginBottom: 8 },
   h2: { fontSize: 20, fontWeight: "700", color: "#0d382b", marginTop: 4, marginBottom: 8 },
   muted: { color: "#384f45", marginBottom: 14, lineHeight: 20, fontSize: 13 },
-  banner: {
-    backgroundColor: "#fee2e2",
-    color: "#991b1b",
-    padding: 12,
-    marginTop: 48,
+  notice: {
+    marginTop: 46,
     marginHorizontal: 16,
-    borderRadius: 12,
-    fontSize: 13,
-    fontWeight: "600",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    backgroundColor: "#fff1f2",
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
+  noticeTextWrap: { flex: 1, paddingRight: 10 },
+  noticeTitle: { color: "#991b1b", fontSize: 12, fontWeight: "800" },
+  noticeText: { color: "#9f1239", fontSize: 12, lineHeight: 18, marginTop: 2 },
+  noticeClose: { borderRadius: 999, backgroundColor: "#ffe4e6", paddingHorizontal: 10, paddingVertical: 6 },
+  noticeCloseText: { color: "#9f1239", fontSize: 11, fontWeight: "800" },
   errorText: { color: "#b91c1c", fontSize: 12, fontWeight: "600", marginBottom: 8 },
   slaBadge: {
     alignSelf: "flex-start",
@@ -1301,6 +1443,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   btnText: { color: "white", fontWeight: "700", fontSize: 14 },
+  pressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
   btnLight: {
     backgroundColor: "white",
     borderRadius: 999,

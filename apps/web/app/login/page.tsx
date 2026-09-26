@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { friendlyError } from "@parasnath/shared";
 import { useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -25,11 +26,11 @@ export default function LoginPage() {
         options: { redirectTo: `${origin}/auth/callback` },
       });
       if (err) {
-        setError(err.message);
+        setError(friendlyError(err));
         setBusy(false);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not start Google sign-in");
+      setError(friendlyError(e, "We could not start Google sign-in. Please try again."));
       setBusy(false);
     }
   }
