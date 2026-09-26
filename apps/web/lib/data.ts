@@ -402,7 +402,10 @@ export async function getSessionUser() {
   }
 }
 
+import { unstable_noStore } from "next/cache";
+
 export async function getProfile(): Promise<Profile | null> {
+  unstable_noStore();
   const cookieStore = await cookies();
   const demoRole = cookieStore.get("parasnath_demo_user")?.value;
   if (demoRole && DEMO_PROFILES[demoRole]) {
