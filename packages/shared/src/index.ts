@@ -137,6 +137,7 @@ export function toE164India(phone: string): string {
 
 export function isProfileComplete(profile: Profile | null): boolean {
   if (!profile) return false;
+  if (profile.role === "admin" || profile.role === "teacher") return true;
   return Boolean(
     profile.profile_completed_at &&
       profile.full_name?.trim() &&

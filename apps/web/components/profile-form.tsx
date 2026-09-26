@@ -88,8 +88,7 @@ export function ProfileForm({
 
       const { error: err } = await supabase
         .from("profiles")
-        .upsert({
-          id: profile.id,
+        .update({
           full_name: fullName.trim(),
           phone: e164,
           class_id: classId,

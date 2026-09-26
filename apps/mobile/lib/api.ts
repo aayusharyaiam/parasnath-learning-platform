@@ -118,15 +118,14 @@ export async function saveProfile(input: {
 }) {
   const { error } = await supabase
     .from("profiles")
-    .upsert({
-      id: input.id,
-      email: input.email,
+    .update({
       full_name: input.full_name,
       phone: input.phone,
       class_id: input.class_id,
       section: input.section,
       school_name: input.school_name,
       roll_number: input.roll_number || null,
+      email: input.email,
       profile_completed_at: new Date().toISOString(),
     })
     .eq("id", input.id);
